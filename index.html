@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="el" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GR Radio - Ελληνικό Διαδικτυακό Ραδιόφωνο</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome για εικονίδια -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- HLS.js για υποστήριξη .m3u8 streams -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased min-h-screen flex flex-col overflow-x-hidden transition-colors duration-200 selection:bg-blue-500 selection:text-white">
+
+    <!-- Header / Navbar -->
+    <header class="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-0 sm:h-16 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-4">
+            <!-- Logo -->
+            <div class="flex items-center gap-2.5 shrink-0 order-1">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid fa-radio text-white text-base sm:text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base sm:text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400 bg-clip-text text-transparent">GR Radio</h1>
+                    <p class="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 -mt-1">Live Ελληνικοί Σταθμοί</p>
+                </div>
+            </div>
+
+            <!-- Right Controls (Clock/Weather + Theme Toggle + Add Button) -->
+            <div class="flex items-center gap-1.5 sm:gap-2 shrink-0 order-2 sm:order-3">
+                <div id="clockWeatherWidget" class="flex items-center gap-1.5 sm:gap-2 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 px-2 sm:px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs shrink-0 transition-colors">
+                    <div class="flex items-center gap-1 text-slate-700 dark:text-slate-200 font-semibold">
+                        <i class="fa-regular fa-clock text-blue-500 dark:text-blue-400"></i>
+                        <span id="liveClock">--:--</span>
+                    </div>
+                    <span class="text-slate-300 dark:text-slate-600">|</span>
+                    <div class="flex items-center gap-1 text-slate-700 dark:text-slate-200" id="weatherBox" title="Τρέχων καιρός">
+                        <i id="weatherIcon" class="fa-solid fa-cloud-sun text-amber-500 dark:text-amber-400"></i>
+                        <span id="weatherTemp">--°C</span>
+                        <span id="weatherCity" class="text-slate-500 dark:text-slate-400 hidden md:inline">Αθήνα</span>
+                    </div>
+                </div>
+
+                <!-- Dark / Light Mode Toggle -->
+                <button 
+                    onclick="toggleTheme()" 
+                    class="shrink-0 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 p-2 rounded-xl text-sm flex items-center justify-center transition-colors"
+                    title="Εναλλαγή Σκούρου / Φωτεινού Θέματος"
+                >
+                    <i id="themeIcon" class="fa-solid fa-sun text-amber-400"></i>
+                </button>
+
+                <button 
+                    onclick="toggleModal(true)" 
+                    class="shrink-0 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 p-2 sm:px-3.5 sm:py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
+                    title="Προσθήκη σταθμού"
+                >
+                    <i class="fa-solid fa-plus text-blue-500 dark:text-blue-400"></i>
+                    <span class="hidden sm:inline">Προσθήκη URL</span>
+                </button>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="w-full sm:w-auto sm:flex-1 sm:max-w-md relative order-3 sm:order-2">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Αναζήτηση σταθμού (π.χ. ΣΚΑΪ, Δρόμος, Offradio)..." 
+                    class="w-full bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-sm rounded-xl pl-10 pr-4 py-2 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-48 sm:pb-32">
+        
+        <!-- Categories Filter Pills -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-none" id="categoryFilters">
+            <button data-cat="all" class="cat-btn active px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white shadow-md shadow-blue-600/20 shrink-0 transition-all">
+                Όλοι οι Σταθμοί
+            </button>
+            <button data-cat="favorites" class="cat-btn px-4 py-2 rounded-xl text-sm font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shrink-0 transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-heart text-rose-500 text-xs"></i> Αγαπημένα
+            </button>
+            <button data-cat="greek" class="cat-btn px-4 py-2 rounded-xl text-sm font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shrink-0 transition-all">
+                Ελληνικά / Λαϊκά
+            </button>
+            <button data-cat="pop" class="cat-btn px-4 py-2 rounded-xl text-sm font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shrink-0 transition-all">
+                Pop & Rock
+            </button>
+            <button data-cat="news" class="cat-btn px-4 py-2 rounded-xl text-sm font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shrink-0 transition-all">
+                Ενημερωτικά / Αθλητικά
+            </button>
+            <button data-cat="chill" class="cat-btn px-4 py-2 rounded-xl text-sm font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shrink-0 transition-all">
+                Chill / Lounge
+            </button>
+            <button data-cat="webradio" class="cat-btn px-4 py-2 rounded-xl text-sm font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shrink-0 transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-globe text-cyan-500 dark:text-cyan-400 text-xs"></i> Web Radio / Ίντερνετ
+            </button>
+        </div>
+
+        <!-- Status / Info Banner -->
+        <div id="statusMessage" class="hidden mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-sm flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-circle-exclamation text-amber-500 dark:text-amber-400"></i>
+                <span id="statusText">Μήνυμα συστήματος</span>
+            </div>
+            <button onclick="hideStatus()" class="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Stations Count -->
+        <div class="flex items-center justify-between mb-4">
+            <h2 id="sectionTitle" class="text-lg font-semibold text-slate-800 dark:text-slate-200">Δημοφιλείς Σταθμοί</h2>
+            <span id="stationCount" class="text-xs text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">Φόρτωση...</span>
+        </div>
+
+        <!-- Stations Grid -->
+        <div id="stationsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden flex-col items-center justify-center py-16 text-center">
+            <div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center mb-4 text-slate-400 dark:text-slate-500 text-2xl">
+                <i class="fa-solid fa-tower-broadcast"></i>
+            </div>
+            <h3 class="text-lg font-medium text-slate-700 dark:text-slate-300">Δεν βρέθηκαν σταθμοί</h3>
+            <p class="text-sm text-slate-500 max-w-sm mt-1">Δοκίμασε διαφορετική αναζήτηση ή πρόσθεσε τον δικό σου σταθμό πατώντας "Προσθήκη URL".</p>
+        </div>
+
+    </main>
+
+    <!-- EXPANDED FULL-SCREEN PLAYER OVERLAY (Spotify-Style) -->
+    <div id="expandedPlayer" class="hidden fixed inset-0 z-50 bg-white/98 dark:bg-slate-950/98 backdrop-blur-2xl flex flex-col justify-between p-5 sm:p-8 pb-24 overflow-y-auto transition-all duration-300">
+        <!-- Top Bar -->
+        <div class="max-w-lg w-full mx-auto flex items-center justify-between">
+            <button onclick="toggleExpandedPlayer(false)" class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors" title="Σμίκρυνση">
+                <i class="fa-solid fa-chevron-down text-lg"></i>
+            </button>
+            <div class="text-center">
+                <span class="text-[11px] uppercase tracking-widest text-slate-500 dark:text-slate-400 font-semibold">Τώρα Ακούτε</span>
+                <div id="expLivePill" class="hidden items-center justify-center gap-1.5 mt-0.5">
+                    <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                    <span class="text-xs font-bold text-rose-500 dark:text-rose-400">ΖΩΝΤΑΝΗ ΜΕΤΑΔΟΣΗ</span>
+                </div>
+            </div>
+            <button id="expFavBtn" onclick="toggleCurrentStationFav()" class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-500 flex items-center justify-center transition-colors" title="Αγαπημένο">
+                <i id="expFavIcon" class="fa-regular fa-heart text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Center Artwork & Full Metadata -->
+        <div class="max-w-lg w-full mx-auto flex flex-col items-center text-center my-auto py-4">
+            <!-- Large Artwork -->
+            <div class="relative w-36 h-36 sm:w-48 sm:h-48 rounded-3xl bg-slate-100 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 shadow-2xl shadow-blue-500/10 overflow-hidden mb-6">
+                <img id="expLogo" src="https://placehold.co/200x200/1e293b/60a5fa?text=FM" alt="Station Artwork" class="w-full h-full object-cover">
+                <div id="expEqualizer" class="hidden absolute inset-0 bg-slate-950/55 flex items-center justify-center gap-1.5">
+                    <span class="w-1.5 h-8 bg-blue-400 rounded-full animate-pulse"></span>
+                    <span class="w-1.5 h-12 bg-cyan-400 rounded-full animate-bounce"></span>
+                    <span class="w-1.5 h-6 bg-blue-400 rounded-full animate-pulse"></span>
+                    <span class="w-1.5 h-10 bg-cyan-300 rounded-full animate-bounce"></span>
+                </div>
+            </div>
+
+            <!-- Station Name & City -->
+            <h2 id="expStationName" class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white leading-tight">Επίλεξε έναν σταθμό</h2>
+            <p id="expStationMeta" class="text-sm text-slate-500 dark:text-slate-400 mt-1.5">Έτοιμο για αναπαραγωγή</p>
+
+            <!-- Full Song / Program Info Card -->
+            <div id="expSongCard" class="hidden w-full mt-6 p-4 rounded-2xl bg-slate-100/90 dark:bg-slate-900/90 border border-cyan-500/30 shadow-lg">
+                <div class="flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-1.5">
+                    <i class="fa-solid fa-music animate-pulse"></i>
+                    <span>Πληροφορίες Κομματιού / Εκπομπής</span>
+                </div>
+                <p id="expSongTitle" class="text-base sm:text-lg font-semibold text-slate-900 dark:text-white leading-snug break-words select-all"></p>
+                
+                <!-- Big Action Buttons for Song (YouTube, Spotify & Copy) -->
+                <div class="grid grid-cols-2 gap-2.5 mt-4">
+                    <a id="expYoutubeLink" href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" onclick="handleExternalAppClick(event, 'youtube')" class="py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20 transition-all">
+                        <i class="fa-brands fa-youtube text-base"></i>
+                        <span>YouTube</span>
+                    </a>
+                    <a id="expSpotifyLink" href="https://open.spotify.com" target="_blank" rel="noopener noreferrer" onclick="handleExternalAppClick(event, 'spotify')" class="py-2.5 px-3 rounded-xl bg-[#1DB954] hover:bg-[#1ed760] active:scale-95 text-slate-950 font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all">
+                        <i class="fa-brands fa-spotify text-base"></i>
+                        <span>Spotify</span>
+                    </a>
+                </div>
+                <p id="expSandboxHint" class="hidden text-[11px] text-emerald-600 dark:text-emerald-400 mt-2 font-medium"></p>
+                <button onclick="copySongTitle()" class="copy-song-btn w-full mt-2.5 py-2 px-4 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-medium text-xs flex items-center justify-center gap-2 transition-all">
+                    <i class="fa-regular fa-copy"></i>
+                    <span>Αντιγραφή Τίτλου</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Bottom Playback & Volume Controls -->
+        <div class="max-w-lg w-full mx-auto space-y-5">
+            <div class="flex items-center justify-center gap-8">
+                <button onclick="playAdjacent(-1)" class="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center transition-all" title="Προηγούμενος">
+                    <i class="fa-solid fa-backward-step text-xl"></i>
+                </button>
+                <button onclick="togglePlay()" class="w-16 h-16 rounded-3xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white flex items-center justify-center shadow-xl shadow-blue-600/30 transition-all">
+                    <i id="expPlayPauseIcon" class="fa-solid fa-play text-2xl ml-0.5"></i>
+                </button>
+                <button onclick="playAdjacent(1)" class="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center transition-all" title="Επόμενος">
+                    <i class="fa-solid fa-forward-step text-xl"></i>
+                </button>
+            </div>
+
+            <div class="flex items-center gap-3 bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 px-4 py-3 rounded-2xl">
+                <button onclick="toggleMute()" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                    <i id="expVolumeIcon" class="fa-solid fa-volume-high"></i>
+                </button>
+                <input 
+                    type="range" 
+                    id="expVolumeSlider" 
+                    min="0" 
+                    max="1" 
+                    step="0.01" 
+                    value="0.8" 
+                    class="flex-1 accent-blue-500 bg-slate-300 dark:bg-slate-700 h-1.5 rounded-lg cursor-pointer"
+                >
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Sticky Mini Audio Player -->
+    <footer class="fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 shadow-2xl pb-12 sm:pb-0 transition-colors">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-0 sm:h-24 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4">
+            
+            <!-- Top Row: Station Info + Controls -->
+            <div class="flex items-center justify-between gap-2 min-w-0 flex-1">
+                <div onclick="toggleExpandedPlayer(true)" class="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1 cursor-pointer group" title="Πάτησε για μεγέθυνση του player">
+                    <div class="relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center">
+                        <img id="playerLogo" src="https://placehold.co/100x100/1e293b/60a5fa?text=FM" alt="Station Logo" class="w-full h-full object-cover">
+                        <div id="playingOverlay" class="hidden absolute inset-0 bg-slate-950/60 flex items-center justify-center gap-1">
+                            <span class="w-1 h-4 bg-blue-400 rounded-full animate-pulse"></span>
+                            <span class="w-1 h-6 bg-cyan-400 rounded-full animate-bounce"></span>
+                            <span class="w-1 h-3 bg-blue-400 rounded-full animate-pulse"></span>
+                        </div>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5">
+                            <h3 id="playerName" class="font-semibold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate text-sm sm:text-base transition-colors">Επίλεξε έναν σταθμό</h3>
+                            <span id="liveBadge" class="hidden shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-rose-500/15 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 rounded-md">LIVE</span>
+                        </div>
+                        <p id="playerMeta" class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">Πάτησε εδώ για πλήρη προβολή</p>
+                    </div>
+                </div>
+
+                <!-- Controls + Expand Button -->
+                <div class="flex items-center gap-1 sm:gap-3 shrink-0">
+                    <button onclick="toggleExpandedPlayer(true)" class="p-2 text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/70 rounded-xl transition-colors" title="Μεγέθυνση Player">
+                        <i class="fa-solid fa-up-right-and-down-left-from-center text-xs sm:text-sm"></i>
+                    </button>
+
+                    <button id="prevBtn" onclick="playAdjacent(-1)" class="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800" title="Προηγούμενος">
+                        <i class="fa-solid fa-backward-step text-base sm:text-lg"></i>
+                    </button>
+                    
+                    <button id="playPauseBtn" onclick="togglePlay()" class="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-blue-600/30 transition-all">
+                        <i id="playPauseIcon" class="fa-solid fa-play text-lg sm:text-xl ml-0.5"></i>
+                    </button>
+
+                    <button id="nextBtn" onclick="playAdjacent(1)" class="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800" title="Επόμενος">
+                        <i class="fa-solid fa-forward-step text-base sm:text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Single Clean Now Playing Bar -->
+            <div id="nowPlayingBar" class="hidden items-center justify-between gap-2 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-xl px-2.5 py-1.5 text-xs text-cyan-700 dark:text-cyan-400 font-medium sm:max-w-md sm:flex-1">
+                <div onclick="toggleExpandedPlayer(true)" class="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer">
+                    <i class="fa-solid fa-music text-[10px] animate-pulse shrink-0"></i>
+                    <span id="miniSongLabel" class="truncate"></span>
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                    <a id="miniYoutubeLink" href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" onclick="handleExternalAppClick(event, 'youtube')" class="px-2 py-0.5 rounded-lg bg-rose-500/15 dark:bg-rose-500/20 hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-[11px] flex items-center gap-1 transition-colors" title="Αναζήτηση στο YouTube">
+                        <i class="fa-brands fa-youtube"></i>
+                        <span class="hidden xs:inline">YT</span>
+                    </a>
+                    <a id="miniSpotifyLink" href="https://open.spotify.com" target="_blank" rel="noopener noreferrer" onclick="handleExternalAppClick(event, 'spotify')" class="px-2 py-0.5 rounded-lg bg-emerald-500/15 dark:bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[11px] flex items-center gap-1 transition-colors" title="Αναζήτηση στο Spotify">
+                        <i class="fa-brands fa-spotify"></i>
+                        <span>Spotify</span>
+                    </a>
+                    <button onclick="copySongTitle()" class="copy-song-btn px-2 py-0.5 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 text-[11px] transition-colors" title="Αντιγραφή τίτλου">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Volume Control (Desktop) -->
+            <div class="hidden lg:flex items-center justify-end gap-3 shrink-0">
+                <button id="muteBtn" onclick="toggleMute()" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-2 rounded-lg transition-colors">
+                    <i id="volumeIcon" class="fa-solid fa-volume-high"></i>
+                </button>
+                <input 
+                    type="range" 
+                    id="volumeSlider" 
+                    min="0" 
+                    max="1" 
+                    step="0.01" 
+                    value="0.8" 
+                    class="w-24 accent-blue-500 bg-slate-300 dark:bg-slate-700 h-1.5 rounded-lg cursor-pointer"
+                >
+            </div>
+
+        </div>
+    </footer>
+
+    <!-- Add Custom Station Modal -->
+    <div id="customModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white">Προσθήκη Νέου Σταθμού</h3>
+                <button onclick="toggleModal(false)" class="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form id="customStationForm" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Όνομα Σταθμού *</label>
+                    <input type="text" id="customName" required placeholder="π.χ. My Web Radio" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Stream URL (MP3 / AAC / M3U8) *</label>
+                    <input type="url" id="customUrl" required placeholder="https://stream.example.com/live.mp3" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Κατηγορία</label>
+                    <select id="customCat" class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="greek">Ελληνικά / Λαϊκά</option>
+                        <option value="pop">Pop & Rock</option>
+                        <option value="news">Ενημερωτικά / Αθλητικά</option>
+                        <option value="chill">Chill / Lounge</option>
+                        <option value="webradio">Web Radio / Ίντερνετ</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="toggleModal(false)" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Ακύρωση</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 transition-colors">Αποθήκευση</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Hidden HTML5 Audio Element -->
+    <audio id="audioPlayer" preload="none"></audio>
+
+    <script>
+        // --- ΔΕΔΟΜΕΝΑ & ΚΑΤΑΣΤΑΣΗ ΕΦΑΡΜΟΓΗΣ ---
+        const curatedStations = [
+            { id: 'enlefko', name: 'En Lefko 87.7', matchKey: 'en lefko', city: 'Αθήνα', category: 'chill', url: 'https://stream.radiojar.com/enlefko877', radiojarId: 'enlefko877', logo: 'https://placehold.co/120x120/1e293b/f8fafc?text=87.7' },
+            { id: 'melodia', name: 'Μελωδία 99.2', matchKey: 'melodia', city: 'Αθήνα', category: 'greek', url: 'https://stream.radiojar.com/melodia992', radiojarId: 'melodia992', logo: 'https://placehold.co/120x120/1e293b/fb7185?text=99.2' },
+            { id: 'diesi', name: 'Δίεση 101.3', matchKey: 'diesi', city: 'Αθήνα', category: 'greek', url: 'https://stream.radiojar.com/diesi1013', radiojarId: 'diesi1013', logo: 'https://placehold.co/120x120/1e293b/34d399?text=101.3' },
+            { id: 'kosmos', name: 'Kosmos 93.6 (ΕΡΤ)', matchKey: 'kosmos', city: 'Αθήνα', category: 'chill', url: 'https://radiostreaming.ert.gr/ert-kosmos', logo: 'https://placehold.co/120x120/1e293b/60a5fa?text=ERT' },
+            { id: 'zeppelin', name: 'Zeppelin 106.7 (ΕΡΤ)', matchKey: 'zeppelin', city: 'Αθήνα', category: 'pop', url: 'https://radiostreaming.ert.gr/ert-zeppelin', logo: 'https://placehold.co/120x120/1e293b/facc15?text=106.7' },
+            { id: 'dromos', name: 'Δρόμος 89.8 FM', matchKey: 'dromos', city: 'Αθήνα', category: 'greek', url: 'https://netradio.live24.gr/dromos2', logo: 'https://placehold.co/120x120/1e293b/38bdf8?text=89.8' },
+            { id: 'rythmos', name: 'Ρυθμός 94.9 FM', matchKey: 'rythmos', city: 'Αθήνα', category: 'greek', url: 'https://stream.radiojar.com/g4423438982tv', logo: 'https://placehold.co/120x120/1e293b/f43f5e?text=94.9' },
+            { id: 'sfera', name: 'Sfera 102.2 FM', matchKey: 'sfera', city: 'Αθήνα', category: 'greek', url: 'https://sfera.live24.gr/sfera4132', logo: 'https://placehold.co/120x120/1e293b/a855f7?text=102.2' },
+            { id: 'lampsi', name: 'Λάμψη 92.3 FM', matchKey: 'lampsi', city: 'Αθήνα', category: 'greek', url: 'https://az11.yesstreaming.net:8140/radio.mp3', logo: 'https://placehold.co/120x120/1e293b/eab308?text=92.3' },
+            { id: 'offradio', name: 'Offradio (Web)', matchKey: 'offradio', city: 'Θεσσαλονίκη • Web', category: 'webradio', url: 'https://s3.yesstreaming.net:17062/stream', logo: 'https://placehold.co/120x120/1e293b/22d3ee?text=OFF' },
+            { id: 'nostos', name: 'Nostos 100.6', matchKey: 'nostos', city: 'Αθήνα', category: 'webradio', url: 'https://stream.radiojar.com/nostos1006', radiojarId: 'nostos1006', logo: 'https://placehold.co/120x120/1e293b/fb923c?text=NOSTOS' },
+            { id: 'skai', name: 'ΣΚΑΪ 100.3 FM', matchKey: 'skai', city: 'Αθήνα', category: 'news', url: 'https://skai.live24.gr/skai1003', logo: 'https://placehold.co/120x120/1e293b/3b82f6?text=SKAI' },
+            { id: 'real', name: 'Real FM 97.8', matchKey: 'real', city: 'Αθήνα', category: 'news', url: 'https://realfm.live24.gr/realfm', logo: 'https://placehold.co/120x120/1e293b/ef4444?text=REAL' },
+            { id: 'sportfm', name: 'bwinΣΠΟΡ FM 94.6', matchKey: 'sport fm 94.6', city: 'Αθήνα', category: 'news', url: 'https://sportfm.live24.gr/sportfm7712', logo: 'https://placehold.co/120x120/1e293b/22c55e?text=94.6' },
+            { id: 'red', name: 'Red FM 96.3', matchKey: 'red 96.3', city: 'Αθήνα', category: 'pop', url: 'https://netradio.live24.gr/red9630', logo: 'https://placehold.co/120x120/1e293b/dc2626?text=RED' },
+            { id: 'rockfm', name: 'Rock FM 96.9', matchKey: 'rock fm', city: 'Αθήνα', category: 'pop', url: 'https://az10.yesstreaming.net:8060/radio.mp3', logo: 'https://placehold.co/120x120/1e293b/f97316?text=ROCK' },
+            { id: 'kiss', name: 'Kiss FM 92.9', matchKey: 'kiss 92.9', city: 'Αθήνα', category: 'pop', url: 'https://kissfm.live24.gr/kissfmathens', logo: 'https://placehold.co/120x120/1e293b/ec4899?text=KISS' },
+            { id: 'pepper', name: 'Pepper 96.6', matchKey: 'pepper', city: 'Αθήνα', category: 'chill', url: 'https://netradio.live24.gr/pepper9660', logo: 'https://placehold.co/120x120/1e293b/14b8a6?text=96.6' },
+            { id: 'best', name: 'Best 92.6', matchKey: 'best 92.6', city: 'Αθήνα', category: 'chill', url: 'https://stream.radiojar.com/best926', radiojarId: 'best926', logo: 'https://placehold.co/120x120/1e293b/8b5cf6?text=BEST' },
+            { id: 'imagine', name: 'Imagine 89.7', matchKey: 'imagine', city: 'Θεσσαλονίκη', category: 'pop', url: 'https://imagine897.radioca.st/stream', logo: 'https://placehold.co/120x120/1e293b/38bdf8?text=89.7' },
+            { id: 'velvet', name: 'Velvet 96.8', matchKey: 'velvet', city: 'Θεσσαλονίκη', category: 'chill', url: 'https://stream.radiojar.com/velvet968', radiojarId: 'velvet968', logo: 'https://placehold.co/120x120/1e293b/c084fc?text=96.8' },
+            { id: 'menta88', name: 'Μέντα 88', matchKey: 'menta 88', city: 'Αθήνα', category: 'chill', url: 'https://netradio.live24.gr/menta88ath', logo: 'https://menta88.gr/wp-content/uploads/2021/12/-LOGO-02-2021-e1639364215612.jpg' },
+            { id: 'ert90s', name: 'ERT 90s', matchKey: 'ert 90s', city: 'Ελλάδα', category: 'pop', url: 'https://radiostreaming.ert.gr/radio-90s', logo: 'https://placehold.co/120x120/1e293b/60a5fa?text=ERT' },
+            { id: 'erttrito', name: 'ΕΡΤ Τρίτο Πρόγραμμα', matchKey: 'ert trito', city: 'Ελλάδα', category: 'chill', url: 'https://radiostreaming.ert.gr/ert-trito', logo: 'https://placehold.co/120x120/1e293b/60a5fa?text=ERT' },
+            { id: '902radio', name: '902 Αριστερά στα FM', matchKey: '902.gr', city: 'Αθήνα', category: 'news', url: 'https://icecast.902.gr:8001/904', logo: 'https://www.902.gr/sites/all/themes/theme902/logo.gif' }
+        ];
+
+        function readStoredArray(key, fallback) {
+            try {
+                const value = JSON.parse(localStorage.getItem(key));
+                return Array.isArray(value) ? value : fallback;
+            } catch (e) { return fallback; }
+        }
+
+        function readStoredValue(key) {
+            try { return localStorage.getItem(key); } catch (e) { return null; }
+        }
+
+        let allStations = [...curatedStations];
+        let favorites = readStoredArray('gr_radio_favs', ['enlefko', 'melodia', 'dromos']).filter(value => typeof value === 'string');
+        let customStations = readStoredArray('gr_radio_custom', []);
+        let lastPlayedId = readStoredValue('gr_radio_last_played');
+        
+        let currentStation = null;
+        let isPlaying = false;
+        let activeCategory = 'all';
+        let searchQuery = '';
+        let metadataInterval = null;
+        let reconnectTimeout = null;
+        let reconnectAttempts = 0;
+        let hlsInstance = null;
+        let currentSongTitle = '';
+
+        // DOM Elements
+        const audio = document.getElementById('audioPlayer');
+        const stationsGrid = document.getElementById('stationsGrid');
+        const emptyState = document.getElementById('emptyState');
+        const stationCount = document.getElementById('stationCount');
+        const searchInput = document.getElementById('searchInput');
+        const playPauseIcon = document.getElementById('playPauseIcon');
+        const expPlayPauseIcon = document.getElementById('expPlayPauseIcon');
+        const playingOverlay = document.getElementById('playingOverlay');
+        const expEqualizer = document.getElementById('expEqualizer');
+        const liveBadge = document.getElementById('liveBadge');
+        const expLivePill = document.getElementById('expLivePill');
+        const nowPlayingBar = document.getElementById('nowPlayingBar');
+        const miniSongLabel = document.getElementById('miniSongLabel');
+        const expSongCard = document.getElementById('expSongCard');
+        const expSongTitle = document.getElementById('expSongTitle');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const expVolumeSlider = document.getElementById('expVolumeSlider');
+        const volumeIcon = document.getElementById('volumeIcon');
+        const expVolumeIcon = document.getElementById('expVolumeIcon');
+
+        // --- ΑΡΧΙΚΟΠΟΙΗΣΗ ---
+        window.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            allStations = dedupeStations([...customStations, ...curatedStations]);
+            audio.volume = volumeSlider.value;
+            
+            // Προ-φόρτωση στοιχείων τελευταίου σταθμού στον player
+            if (lastPlayedId) {
+                const lastSt = allStations.find(s => s.id === lastPlayedId);
+                if (lastSt) preloadLastStationUI(lastSt);
+            }
+
+            renderStations();
+            fetchExtraGreekStations();
+            initClockAndWeather();
+            setupAutoReconnect();
+        });
+
+        function preloadLastStationUI(station) {
+            currentStation = station;
+            document.getElementById('playerName').textContent = station.name;
+            document.getElementById('expStationName').textContent = station.name;
+            setMetaText(`${station.city} • Πάτησε Play για συνέχεια`);
+            document.getElementById('playerLogo').src = station.logo;
+            document.getElementById('expLogo').src = station.logo;
+            updateExpandedFavIcon();
+        }
+
+        // --- DARK / LIGHT THEME TOGGLE ---
+        function initTheme() {
+            const savedTheme = localStorage.getItem('gr_radio_theme') || 'dark';
+            applyTheme(savedTheme);
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const nextTheme = isDark ? 'light' : 'dark';
+            localStorage.setItem('gr_radio_theme', nextTheme);
+            applyTheme(nextTheme);
+        }
+
+        function applyTheme(theme) {
+            const html = document.documentElement;
+            const icon = document.getElementById('themeIcon');
+            if (theme === 'dark') {
+                html.classList.add('dark');
+                if (icon) icon.className = 'fa-solid fa-sun text-amber-400';
+            } else {
+                html.classList.remove('dark');
+                if (icon) icon.className = 'fa-solid fa-moon text-slate-700';
+            }
+            updateCategoryButtonsUI();
+        }
+
+        // --- EXPANDED PLAYER TOGGLE ---
+        function toggleExpandedPlayer(show) {
+            const modal = document.getElementById('expandedPlayer');
+            if (show) {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+                updateExpandedFavIcon();
+            } else {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        }
+
+        function toggleCurrentStationFav() {
+            if (!currentStation) return;
+            toggleFavorite(null, currentStation.id);
+            updateExpandedFavIcon();
+        }
+
+        function updateExpandedFavIcon() {
+            if (!currentStation) return;
+            const isFav = favorites.includes(currentStation.id);
+            const icon = document.getElementById('expFavIcon');
+            icon.className = isFav ? 'fa-solid fa-heart text-rose-500 text-lg' : 'fa-regular fa-heart text-lg';
+        }
+
+        // --- ΖΩΝΤΑΝΗ ΩΡΑ & ΚΑΙΡΟΣ ---
+        function initClockAndWeather() {
+            function updateClock() {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const clockEl = document.getElementById('liveClock');
+                if (clockEl) clockEl.textContent = timeStr;
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    pos => fetchWeather(pos.coords.latitude, pos.coords.longitude, 'Τοποθεσία'),
+                    () => fetchWeather(37.9838, 23.7275, 'Αθήνα'),
+                    { timeout: 5000 }
+                );
+            } else {
+                fetchWeather(37.9838, 23.7275, 'Αθήνα');
+            }
+        }
+
+        async function fetchWeather(lat, lon, cityLabel) {
+            try {
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+                const res = await fetch(url);
+                if (!res.ok) return;
+                const data = await res.json();
+                const cw = data.current_weather;
+                if (!cw) return;
+
+                document.getElementById('weatherTemp').textContent = `${Math.round(cw.temperature)}°C`;
+                document.getElementById('weatherCity').textContent = cityLabel;
+
+                const iconEl = document.getElementById('weatherIcon');
+                const code = cw.weathercode;
+                if (code === 0) iconEl.className = 'fa-solid fa-sun text-amber-500 dark:text-amber-400';
+                else if (code <= 3) iconEl.className = 'fa-solid fa-cloud-sun text-amber-500 dark:text-amber-300';
+                else if (code <= 48) iconEl.className = 'fa-solid fa-smog text-slate-400';
+                else if (code <= 67 || (code >= 80 && code <= 82)) iconEl.className = 'fa-solid fa-cloud-rain text-blue-500 dark:text-blue-400';
+                else if (code <= 77) iconEl.className = 'fa-solid fa-snowflake text-cyan-500 dark:text-cyan-300';
+                else iconEl.className = 'fa-solid fa-cloud-bolt text-yellow-500 dark:text-yellow-400';
+            } catch (e) {}
+        }
+
+        // Ανάκτηση & αυτόματη ενημέρωση ζωντανών URLs από το Radio-Browser API
+        async function fetchExtraGreekStations() {
+            try {
+                const res = await fetch('https://de1.api.radio-browser.info/json/stations/bycountrycodeexact/GR?limit=500&order=clickcount&reverse=true&hidebroken=true');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                curatedStations.forEach(cs => {
+                    if (!cs.matchKey) return;
+                    const liveMatch = data.find(item => 
+                        item.url_resolved && 
+                        item.url_resolved.startsWith('https://') &&
+                        item.lastcheckok === 1 &&
+                        item.name.toLowerCase().includes(cs.matchKey)
+                    );
+                    if (liveMatch) {
+                        cs.url = liveMatch.url_resolved;
+                        if (liveMatch.url_resolved.includes('stream.radiojar.com/')) {
+                            cs.radiojarId = liveMatch.url_resolved.split('stream.radiojar.com/')[1].split('/')[0].split('?')[0];
+                        }
+                    }
+                });
+
+                const existingKeys = curatedStations.map(s => s.matchKey || s.name.toLowerCase().slice(0, 6));
+                
+                const mapped = data
+                    .filter(item => item.url_resolved && item.url_resolved.startsWith('https://') && item.lastcheckok === 1)
+                    .filter(item => {
+                        const lower = item.name.trim().toLowerCase();
+                        return !existingKeys.some(k => lower.includes(k));
+                    })
+                    .map(item => {
+                        const name = item.name.trim();
+                        const tags = (item.tags || '').toLowerCase();
+                        const hasFrequency = /\b(8[7-9]|9\d|10[0-8])(\.\d)?\b/.test(name);
+                        
+                        let cat = 'pop';
+                        if (tags.includes('greek') || tags.includes('laika') || tags.includes('ellinika') || tags.includes('entehno')) {
+                            cat = 'greek';
+                        } else if (tags.includes('news') || tags.includes('talk') || tags.includes('sport')) {
+                            cat = 'news';
+                        } else if (tags.includes('chill') || tags.includes('lounge') || tags.includes('jazz') || tags.includes('ambient')) {
+                            cat = 'chill';
+                        } else if (!hasFrequency || tags.includes('web') || tags.includes('online') || name.toLowerCase().includes('web')) {
+                            cat = 'webradio';
+                        }
+
+                        let rjId = null;
+                        if (item.url_resolved.includes('stream.radiojar.com/')) {
+                            rjId = item.url_resolved.split('stream.radiojar.com/')[1].split('/')[0].split('?')[0];
+                        }
+
+                        return {
+                            id: 'api_' + item.stationuuid,
+                            name: name,
+                            city: item.state || (cat === 'webradio' ? 'Web Radio' : 'Ελλάδα'),
+                            category: cat,
+                            url: item.url_resolved,
+                            radiojarId: rjId,
+                            logo: item.favicon && item.favicon.startsWith('https://') 
+                                  ? item.favicon 
+                                  : `https://placehold.co/120x120/1e293b/94a3b8?text=${encodeURIComponent(name.substring(0, 3).toUpperCase())}`
+                        };
+                    });
+
+                allStations = dedupeStations([...customStations, ...curatedStations, ...mapped]);
+                
+                // Αν ο τελευταίος σταθμός ήταν από το API και μόλις φορτώθηκε
+                if (lastPlayedId && !currentStation) {
+                    const lastSt = allStations.find(s => s.id === lastPlayedId);
+                    if (lastSt) preloadLastStationUI(lastSt);
+                }
+
+                renderStations();
+            } catch (err) {
+                console.log('Χρήση τοπικής λίστας σταθμών.');
+            }
+        }
+
+        // --- ΑΝΑΚΤΗΣΗ LIVE METADATA (ΤΙ ΠΑΙΖΕΙ ΤΩΡΑ) ---
+        function startMetadataPolling(station) {
+            stopMetadataPolling();
+            updateNowPlayingUI('');
+            
+            fetchStationMetadata(station);
+            metadataInterval = setInterval(() => {
+                if (isPlaying && currentStation && currentStation.id === station.id) {
+                    fetchStationMetadata(station);
+                }
+            }, 15000);
+        }
+
+        function stopMetadataPolling() {
+            if (metadataInterval) {
+                clearInterval(metadataInterval);
+                metadataInterval = null;
+            }
+        }
+
+        async function fetchStationMetadata(station) {
+            try {
+                const rjId = station.radiojarId || (station.url.includes('stream.radiojar.com/') ? station.url.split('stream.radiojar.com/')[1].split('/')[0].split('?')[0] : null);
+                if (rjId) {
+                    const res = await fetch(`https://www.radiojar.com/api/stations/${rjId}/now_playing/`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.title) {
+                            const track = data.artist ? `${data.artist} - ${data.title}` : data.title;
+                            updateNowPlayingUI(track);
+                            return;
+                        }
+                    }
+                }
+
+                const metaUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(station.url.replace(/\/$/, '') + '/status-json.xsl')}`;
+                const res = await fetch(metaUrl);
+                if (res.ok) {
+                    const wrapper = await res.json();
+                    if (wrapper.contents && wrapper.contents.includes('icestats')) {
+                        const iceData = JSON.parse(wrapper.contents);
+                        const source = Array.isArray(iceData.icestats.source) ? iceData.icestats.source[0] : iceData.icestats.source;
+                        if (source && source.title) {
+                            updateNowPlayingUI(source.title);
+                            return;
+                        }
+                    }
+                }
+            } catch (e) {}
+        }
+
+        function updateNowPlayingUI(trackText) {
+            const cleanText = (trackText || '').trim();
+            
+            if (!cleanText || cleanText.toLowerCase() === 'unknown' || cleanText.length < 3) {
+                currentSongTitle = '';
+                nowPlayingBar.classList.add('hidden');
+                nowPlayingBar.classList.remove('flex');
+                expSongCard.classList.add('hidden');
+                return;
+            }
+
+            currentSongTitle = cleanText;
+            miniSongLabel.textContent = cleanText;
+            expSongTitle.textContent = cleanText;
+            
+            // Ενημέρωση των links αναζήτησης για YouTube & Spotify (ώστε να ανοίγουν πάντα στο κινητό)
+            const cleanedQuery = cleanText.replace(/\s*-\s*/g, ' ').replace(/\s+/g, ' ').trim();
+            const encodedQuery = encodeURIComponent(cleanedQuery);
+            const ytUrl = `https://www.youtube.com/results?search_query=${encodedQuery}`;
+            const spUrl = `https://open.spotify.com/search/${encodedQuery}`;
+
+            ['miniYoutubeLink', 'expYoutubeLink'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.href = ytUrl;
+            });
+            ['miniSpotifyLink', 'expSpotifyLink'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.href = spUrl;
+            });
+            
+            nowPlayingBar.classList.remove('hidden');
+            nowPlayingBar.classList.add('flex');
+            expSongCard.classList.remove('hidden');
+
+            if ('mediaSession' in navigator && currentStation) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: cleanText,
+                    artist: currentStation.name,
+                    album: 'GR Radio Live',
+                    artwork: [{ src: currentStation.logo, sizes: '120x120', type: 'image/png' }]
+                });
+            }
+        }
+
+        // --- ΕΝΕΡΓΕΙΕΣ ΤΡΑΓΟΥΔΙΟΥ (YOUTUBE, SPOTIFY & COPY) ---
+        function handleExternalAppClick(event, platform) {
+            if (!currentSongTitle) return;
+            
+            // Αντιγράφει αυτόματα τον τίτλο στο πρόχειρο ως εφεδρική λύση αν το Preview iframe μπλοκάρει το νέο παράθυρο
+            const tempInput = document.createElement('input');
+            tempInput.value = currentSongTitle;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            const hint = document.getElementById('expSandboxHint');
+            if (hint) {
+                const appName = platform === 'spotify' ? 'Spotify' : 'YouTube';
+                hint.textContent = `✓ Αντιγράφηκε! Αν το Preview μπλοκάρει το ${appName}, κάνε επικόλληση στην εφαρμογή.`;
+                hint.classList.remove('hidden');
+                setTimeout(() => hint.classList.add('hidden'), 5000);
+            }
+        }
+
+        function copySongTitle() {
+            if (!currentSongTitle) return;
+            const tempInput = document.createElement('input');
+            tempInput.value = currentSongTitle;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            document.querySelectorAll('.copy-song-btn').forEach(btn => {
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check text-emerald-500"></i>';
+                setTimeout(() => { btn.innerHTML = originalHTML; }, 1500);
+            });
+        }
+
+        // --- ΑΥΤΟΜΑΤΗ ΕΠΑΝΑΣΥΝΔΕΣΗ (AUTO-RECONNECT) ---
+        function setupAutoReconnect() {
+            const triggerReconnect = () => {
+                if (!isPlaying || !currentStation) return;
+                clearTimeout(reconnectTimeout);
+                reconnectAttempts++;
+                const delay = Math.min(reconnectAttempts * 2500, 10000);
+                setMetaText(`Διακοπή σήματος • Επανασύνδεση (${reconnectAttempts})...`);
+
+                reconnectTimeout = setTimeout(() => {
+                    if (!isPlaying || !currentStation) return;
+                    playStreamUrl(currentStation.url, true);
+                }, delay);
+            };
+
+            audio.addEventListener('error', triggerReconnect);
+            audio.addEventListener('stalled', triggerReconnect);
+            audio.addEventListener('ended', triggerReconnect);
+            audio.addEventListener('playing', () => {
+                reconnectAttempts = 0;
+                clearTimeout(reconnectTimeout);
+                if (currentStation) {
+                    setMetaText(`${currentStation.city} • Ζωντανή Μετάδοση`);
+                }
+            });
+            window.addEventListener('online', () => {
+                if (isPlaying && currentStation) triggerReconnect();
+            });
+        }
+
+        function setMetaText(txt) {
+            document.getElementById('playerMeta').textContent = txt;
+            document.getElementById('expStationMeta').textContent = txt;
+        }
+
+        function normalizeStationName(value) {
+            return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+                .replace(/\bfm\b/g, '').replace(/[^a-z0-9\u0370-\u03ff]+/g, ' ').trim().replace(/\s+/g, ' ');
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+        }
+
+        function normalizeStreamUrl(value) {
+            try {
+                const url = new URL(value);
+                const host = url.hostname.toLowerCase().replace(/^www\./, '');
+                return `${host}${url.port ? `:${url.port}` : ''}${url.pathname.replace(/\/$/, '')}`.toLowerCase();
+            } catch (e) { return ''; }
+        }
+
+        function dedupeStations(stations) {
+            const seenNames = new Set();
+            const seenIds = new Set();
+            const seenUrls = new Set();
+            return stations.filter(station => {
+                if (!station || !/^[a-zA-Z0-9_-]+$/.test(String(station.id || '')) || !station.name || !station.url) return false;
+                const nameKey = normalizeStationName(station.name);
+                const urlKey = normalizeStreamUrl(station.url);
+                if (!nameKey || seenIds.has(station.id) || seenNames.has(nameKey) || (urlKey && seenUrls.has(urlKey))) return false;
+                seenIds.add(station.id);
+                seenNames.add(nameKey);
+                if (urlKey) seenUrls.add(urlKey);
+                return true;
+            });
+        }
+
+        // --- ΕΞΥΠΝΗ ΤΑΞΙΝΟΜΗΣΗ & ΑΠΕΙΚΟΝΙΣΗ ΣΤΑΘΜΩΝ ---
+        function getSortedFilteredStations() {
+            const filtered = allStations.filter(station => {
+                const matchesSearch = station.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                      station.city.toLowerCase().includes(searchQuery.toLowerCase());
+                
+                if (!matchesSearch) return false;
+                if (activeCategory === 'all') return true;
+                if (activeCategory === 'favorites') return favorites.includes(station.id);
+                return station.category === activeCategory;
+            });
+
+            // Ταξινόμηση: 1ος ο τελευταίος που ακούστηκε -> 2οι τα αγαπημένα -> 3οι οι υπόλοιποι
+            return filtered.sort((a, b) => {
+                const aIsLast = a.id === lastPlayedId ? 1 : 0;
+                const bIsLast = b.id === lastPlayedId ? 1 : 0;
+                if (aIsLast !== bIsLast) return bIsLast - aIsLast;
+
+                const aIsFav = favorites.includes(a.id) ? 1 : 0;
+                const bIsFav = favorites.includes(b.id) ? 1 : 0;
+                if (aIsFav !== bIsFav) return bIsFav - aIsFav;
+
+                return 0;
+            });
+        }
+
+        function renderStations() {
+            const sortedFiltered = getSortedFilteredStations();
+
+            stationCount.textContent = `${sortedFiltered.length} σταθμοί`;
+
+            if (sortedFiltered.length === 0) {
+                stationsGrid.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            emptyState.classList.remove('flex');
+
+            stationsGrid.innerHTML = sortedFiltered.map(station => {
+                const isCurrent = currentStation && currentStation.id === station.id;
+                const isLast = station.id === lastPlayedId;
+                const isFav = favorites.includes(station.id);
+                const safeName = escapeHtml(station.name);
+                const safeCity = escapeHtml(station.city);
+                const safeLogo = escapeHtml(/^https:\/\//i.test(station.logo || '') ? station.logo : 'https://placehold.co/120x120/1e293b/60a5fa?text=FM');
+                const categoryLabels = {
+                    greek: 'Ελληνικά',
+                    pop: 'Pop / Rock',
+                    news: 'Ενημέρωση',
+                    chill: 'Chill / Lounge',
+                    webradio: 'Web Radio'
+                };
+
+                return `
+                    <div 
+                        onclick="selectStation('${station.id}')" 
+                        class="group relative bg-white dark:bg-slate-900/90 hover:bg-slate-50 dark:hover:bg-slate-800/90 border ${isCurrent && isPlaying ? 'border-blue-500 ring-1 ring-blue-500/50 bg-blue-50/40 dark:bg-slate-800/80' : 'border-slate-200 dark:border-slate-800'} rounded-2xl p-4 flex items-center gap-3.5 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 shadow-sm"
+                    >
+                        <div class="relative w-14 h-14 rounded-xl bg-slate-200 dark:bg-slate-800 overflow-hidden shrink-0 border border-slate-300/70 dark:border-slate-700/70">
+                            <img 
+                                src="${safeLogo}" 
+                                alt="${safeName}" 
+                                onerror="this.onerror=null; this.src='https://placehold.co/120x120/1e293b/60a5fa?text=FM';"
+                                class="w-full h-full object-cover"
+                            >
+                            <div class="absolute inset-0 bg-slate-950/50 ${isCurrent && isPlaying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} flex items-center justify-center transition-opacity">
+                                <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md">
+                                    <i class="fa-solid ${isCurrent && isPlaying ? 'fa-pause' : 'fa-play'} text-xs ${isCurrent && isPlaying ? '' : 'ml-0.5'}"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5">
+                                <h3 class="font-semibold text-slate-900 dark:text-slate-100 text-sm truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">${safeName}</h3>
+                                ${isLast ? '<span class="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25">Τελευταίος</span>' : ''}
+                            </div>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50">
+                                    ${categoryLabels[station.category] || 'Ραδιόφωνο'}
+                                </span>
+                                <span class="text-xs text-slate-500 truncate">${safeCity}</span>
+                            </div>
+                        </div>
+
+                        <button 
+                            onclick="toggleFavorite(event, '${station.id}')" 
+                            class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors shrink-0 ${isFav ? 'text-rose-500' : 'text-slate-400 dark:text-slate-600 hover:text-slate-700 dark:hover:text-slate-300'}"
+                            title="${isFav ? 'Αφαίρεση από αγαπημένα' : 'Προσθήκη στα αγαπημένα'}"
+                        >
+                            <i class="${isFav ? 'fa-solid' : 'fa-regular'} fa-heart"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- ΕΛΕΓΧΟΣ ΑΝΑΠΑΡΑΓΩΓΗΣ (AUDIO PLAYER) ---
+        function selectStation(id) {
+            const station = allStations.find(s => s.id === id);
+            if (!station) return;
+
+            if (currentStation && currentStation.id === station.id && audio.src) {
+                togglePlay();
+                return;
+            }
+
+            currentStation = station;
+            lastPlayedId = station.id;
+            localStorage.setItem('gr_radio_last_played', station.id);
+            hideStatus();
+
+            document.getElementById('playerName').textContent = station.name;
+            document.getElementById('expStationName').textContent = station.name;
+            setMetaText(`${station.city} • Σύνδεση με stream...`);
+            
+            const fallback = 'https://placehold.co/200x200/1e293b/60a5fa?text=FM';
+            const playerLogo = document.getElementById('playerLogo');
+            const expLogo = document.getElementById('expLogo');
+            playerLogo.src = station.logo;
+            expLogo.src = station.logo;
+            playerLogo.onerror = () => { playerLogo.src = fallback; };
+            expLogo.onerror = () => { expLogo.src = fallback; };
+
+            updateExpandedFavIcon();
+            renderStations();
+            playStreamUrl(station.url, false, station);
+        }
+
+        function playStreamUrl(streamUrl, isReconnect = false, stationObj = currentStation) {
+            if (hlsInstance) {
+                hlsInstance.destroy();
+                hlsInstance = null;
+            }
+
+            const isHls = streamUrl.toLowerCase().includes('.m3u8');
+
+            if (isHls && typeof Hls !== 'undefined' && Hls.isSupported()) {
+                hlsInstance = new Hls({ enableWorker: true });
+                hlsInstance.loadSource(streamUrl);
+                hlsInstance.attachMedia(audio);
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                    startAudioPlayback(isReconnect, stationObj);
+                });
+                hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.fatal && !isReconnect) {
+                        handlePlaybackFailure(stationObj);
+                    }
+                });
+            } else {
+                const finalUrl = isReconnect 
+                    ? `${streamUrl}${streamUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`
+                    : streamUrl;
+                audio.src = finalUrl;
+                audio.load();
+                startAudioPlayback(isReconnect, stationObj);
+            }
+        }
+
+        function startAudioPlayback(isReconnect, stationObj) {
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    isPlaying = true;
+                    reconnectAttempts = 0;
+                    updatePlayerUI();
+                    if (stationObj) {
+                        setMetaText(`${stationObj.city} • Ζωντανή Μετάδοση`);
+                        if (!isReconnect) startMetadataPolling(stationObj);
+                    }
+                }).catch(error => {
+                    if (!isReconnect) {
+                        console.error('Playback error:', error);
+                        handlePlaybackFailure(stationObj);
+                    }
+                });
+            }
+        }
+
+        function handlePlaybackFailure(stationObj) {
+            isPlaying = false;
+            stopMetadataPolling();
+            updateNowPlayingUI('');
+            updatePlayerUI();
+            setMetaText('Αδυναμία σύνδεσης');
+            const name = stationObj ? stationObj.name : 'Ο σταθμός';
+            showStatus(`Ο σταθμός "${name}" είναι προσωρινά εκτός λειτουργίας ή δεν υποστηρίζεται το stream του.`);
+        }
+
+        function togglePlay() {
+            const visibleList = getSortedFilteredStations();
+            if (!currentStation) {
+                if (visibleList.length > 0) selectStation(visibleList[0].id);
+                return;
+            }
+
+            if (!audio.src && !hlsInstance) {
+                selectStation(currentStation.id);
+                return;
+            }
+
+            if (isPlaying) {
+                clearTimeout(reconnectTimeout);
+                reconnectAttempts = 0;
+                audio.pause();
+                isPlaying = false;
+                stopMetadataPolling();
+                setMetaText('Σε παύση');
+            } else {
+                setMetaText('Επανασύνδεση...');
+                audio.play().then(() => {
+                    isPlaying = true;
+                    setMetaText(`${currentStation.city} • Ζωντανή Μετάδοση`);
+                    startMetadataPolling(currentStation);
+                }).catch(() => {
+                    playStreamUrl(currentStation.url, false, currentStation);
+                });
+            }
+            updatePlayerUI();
+        }
+
+        function updatePlayerUI() {
+            if (isPlaying) {
+                playPauseIcon.className = 'fa-solid fa-pause text-lg sm:text-xl';
+                expPlayPauseIcon.className = 'fa-solid fa-pause text-2xl';
+                playingOverlay.classList.remove('hidden');
+                expEqualizer.classList.remove('hidden');
+                liveBadge.classList.remove('hidden');
+                expLivePill.classList.remove('hidden');
+                expLivePill.classList.add('flex');
+            } else {
+                playPauseIcon.className = 'fa-solid fa-play text-lg sm:text-xl ml-0.5';
+                expPlayPauseIcon.className = 'fa-solid fa-play text-2xl ml-0.5';
+                playingOverlay.classList.add('hidden');
+                expEqualizer.classList.add('hidden');
+                liveBadge.classList.add('hidden');
+                expLivePill.classList.add('hidden');
+                expLivePill.classList.remove('flex');
+            }
+            renderStations();
+        }
+
+        function playAdjacent(direction) {
+            const list = getSortedFilteredStations();
+            if (list.length === 0) return;
+            if (!currentStation) {
+                selectStation(list[0].id);
+                return;
+            }
+            const currentIndex = list.findIndex(s => s.id === currentStation.id);
+            let nextIndex = currentIndex === -1 ? 0 : (currentIndex + direction + list.length) % list.length;
+            selectStation(list[nextIndex].id);
+        }
+
+        // --- ΕΝΤΑΣΗ ΗΧΟΥ (VOLUME) ---
+        function handleVolumeChange(val) {
+            audio.volume = val;
+            audio.muted = false;
+            volumeSlider.value = val;
+            expVolumeSlider.value = val;
+            updateVolumeIcon();
+        }
+
+        volumeSlider.addEventListener('input', (e) => handleVolumeChange(e.target.value));
+        expVolumeSlider.addEventListener('input', (e) => handleVolumeChange(e.target.value));
+
+        function toggleMute() {
+            audio.muted = !audio.muted;
+            updateVolumeIcon();
+        }
+
+        function updateVolumeIcon() {
+            let iconClass = 'fa-solid fa-volume-high';
+            if (audio.muted || audio.volume === 0) {
+                iconClass = 'fa-solid fa-volume-xmark text-rose-500';
+            } else if (audio.volume < 0.5) {
+                iconClass = 'fa-solid fa-volume-low';
+            }
+            volumeIcon.className = iconClass;
+            expVolumeIcon.className = iconClass;
+        }
+
+        // --- ΑΓΑΠΗΜΕΝΑ, ΦΙΛΤΡΑ & ΑΝΑΖΗΤΗΣΗ ---
+        function toggleFavorite(event, id) {
+            if (event) event.stopPropagation();
+            if (favorites.includes(id)) {
+                favorites = favorites.filter(favId => favId !== id);
+            } else {
+                favorites.push(id);
+            }
+            localStorage.setItem('gr_radio_favs', JSON.stringify(favorites));
+            renderStations();
+        }
+
+        function updateCategoryButtonsUI() {
+            document.querySelectorAll('.cat-btn').forEach(b => {
+                if (b.dataset.cat === activeCategory) {
+                    b.className = 'cat-btn active px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white shadow-md shadow-blue-600/20 shrink-0 transition-all flex items-center gap-1.5';
+                } else {
+                    b.className = 'cat-btn px-4 py-2 rounded-xl text-sm font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shrink-0 transition-all flex items-center gap-1.5';
+                }
+            });
+        }
+
+        document.querySelectorAll('.cat-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                activeCategory = btn.dataset.cat;
+                updateCategoryButtonsUI();
+                document.getElementById('sectionTitle').textContent = btn.textContent.trim();
+                renderStations();
+            });
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            renderStations();
+        });
+
+        // --- ΠΡΟΣΘΗΚΗ CUSTOM URL ---
+        function toggleModal(show) {
+            const modal = document.getElementById('customModal');
+            if (show) modal.classList.remove('hidden');
+            else modal.classList.add('hidden');
+        }
+
+        document.getElementById('customStationForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('customName').value.trim();
+            const url = document.getElementById('customUrl').value.trim();
+            const category = document.getElementById('customCat').value;
+
+            let parsedStreamUrl;
+            try { parsedStreamUrl = new URL(url); } catch (err) { showStatus('Το URL του stream δεν είναι έγκυρο.'); return; }
+            if (parsedStreamUrl.protocol !== 'https:') { showStatus('Χρησιμοποίησε HTTPS URL, ώστε το stream να μην αποκλειστεί από τον browser.'); return; }
+            if (allStations.some(station => normalizeStationName(station.name) === normalizeStationName(name) || normalizeStreamUrl(station.url) === normalizeStreamUrl(url))) {
+                showStatus('Υπάρχει ήδη σταθμός με το ίδιο όνομα ή stream URL.');
+                return;
+            }
+
+            const newStation = {
+                id: 'custom_' + Date.now(),
+                name,
+                city: 'Προσαρμοσμένος',
+                category,
+                url,
+                logo: `https://placehold.co/120x120/1e293b/38bdf8?text=${encodeURIComponent(name.substring(0, 3).toUpperCase())}`
+            };
+
+            customStations.unshift(newStation);
+            localStorage.setItem('gr_radio_custom', JSON.stringify(customStations));
+            allStations = dedupeStations([newStation, ...allStations]);
+            
+            e.target.reset();
+            toggleModal(false);
+            renderStations();
+            selectStation(newStation.id);
+        });
+
+        // --- ΜΗΝΥΜΑΤΑ ΣΦΑΛΜΑΤΟΣ ---
+        function showStatus(msg) {
+            const box = document.getElementById('statusMessage');
+            document.getElementById('statusText').textContent = msg;
+            box.classList.remove('hidden');
+        }
+
+        function hideStatus() {
+            document.getElementById('statusMessage').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
